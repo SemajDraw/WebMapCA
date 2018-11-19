@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% load static %}
+{% load leaflet_tags %}
+{% load socialaccount %}
+
+{% block head %}
+    {#    Profile style sheet#}
+    <link rel="stylesheet" href="{% static "app/css/profile.css" %}" type="text/css"/>
+
+    {#    Make call to rest api which makes call to ticketmaster api parse #}
+    {#    response and create div elements from the response #}
+    <script language="JavaScript" type="text/javascript">
+
+        $(function () {
+            $("#tm_response_list, #interested_list").sortable({
+                connectWith: ".connectedLists",
+                cursor: "move"
+            }).disableSelection();
+        });
+
+        $(function() {
+            $("#search_form").submit(function() {
+                $("#tm_response_list").empty();
+                let search = $("#search_form :input[name='search']").val();
+                let city = $("#search_form :input[name='city']").val();
+                $.get("/get_events/?search=" + search +"&city=" + city)
+                    .done(function(data) {
+                        for(let i = 0; i < data.length; i++){
+                            $("#tm_response_list").append(
+                                '<div class="event_list" id=event"' + i +'">' +
+                                    '<div class="image_div col-sm-4">' +
+                                        '<img class="event_image" src="' + data[i].image + '" style="width: 100%; height: 20vh"/>' +
+                                    '</div>' +
+                                    '<div class="details_div col-sm-8">' +
+                                        '<p class="event_name">Name: ' + data[i].name + '</p>' +
+                                        '<p class="date_time">Date: ' + data[i].date + '</p>' +
+                                        '<p class="date_time">Time: ' + data[i].time + '</p>' +
+                                        '<a class="purchase" href="' + data[i].url + '">Buy tickets!</a>' +
+                                    '</div>' +
+                                '</div> <br>'
+                            )
+                        }
+                        console.log(data);
+                    });
+                return false;
+            })});
+    </script>
+{% endblock %}
+
+{% block content %}
+{% if user.is_authenticated %}
+    <div id="main_div" clas="container-fluid">
+
+        <div id="user_details" class="container">
+            <div class="row justify-content-center">
+                <div class="col-md-4">
+                    <img src="{{ user.profile.profile_picture.url }}" style="width: 20vh; height: 20vh"/>
+                    <br>
+                    <a href="{% url 'app:update_profile_pic' %}">Change profile pic?</a>
+                </div>
+                <div class="col-md-4">
+                    <p>Name: {{ user.first_name }} {{ user.last_name }}</p>
+                    <p>Email: {{ user.email }}</p>
+                    <p>Bio: {{ user.profile.bio }}</p>
+                    <p>Connect a <a href="{% provider_login_url "facebook" process="connect" %}">facebook</a> account</p>
+                </div>
+            </div>
+        </div>
+        <div id="main_div_container" class="container">
+            <div id="list-container" class="container">
+                <div id="row-container" class="row justify-content-center">
+                    <div id="left-col" class="col-md-6">
+                        <div id="left-panel" class="panel panel-default" >
+                            <div class="panel-heading" style="height: 10vh">
+                                <h3 class="panel-title"> Events Near You</h3>
+                                <form id="search_form">
+                                 {% csrf_token %}
+                                     <input type="text" placeholder="Search" name="search">
+                                     <input type="text"  placeholder="City" name="city">
+                                 <button type="submit" >Search</button>
+                             </form>
+                            </div>
+                            <ul id="tm_response_list" class="panel-body connectedLists" style="overflow-y:scroll; height:50vh;">
+                                    {# list of divs from ticketmaster response is generated here #}
+                            </ul>
+                        </div>
+                    </div>
+                    <div id="right-col" class="col-md-6">
+                        <div id="right-panel" class="panel panel-default">
+                            <div class="panel-heading">
+                                <h3 class="panel-title">Interested</h3>
+                            </div>
+                            <ul id="interested_list" class="panel-body connectedLists" style="overflow-y:scroll;">
+                                    {# list of interested events are stored here #}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p id="geom" style="visibility: hidden; display: none">{{ object.last_location.geojson }}</p>
+
+            <script>
+                function map_init(map, options) {
+                    var geom = JSON.parse($("#geom").html());
+                    var myLatLon = L.latLng([geom.coordinates[1], geom.coordinates[0]]);
+
+                    geom = L.geoJson(geom);
+                    geom.addTo(map);
+
+                    map.setView(myLatLon, 16);
+                    L.marker([50.5, 30.5]).addTo(map);
+                }
+            </script>
+
+            <div id="list-container" class="container">
+                <div id="row-container" class="row justify-content-center">
+                    <div id="left-col" class="col-md-6">
+                        <div id="left-panel" class="panel panel-default">
+                            <div class="panel-heading">
+                                <h3 class="panel-title">Gig</h3>
+                            </div>
+                            <div class="panel-body">
+                                Clicked on markers content from ticketmaster
+                            </div>
+                        </div>
+                    </div>
+                    <div id="right-col" class="col-md-6">
+                        <div id="leaflet-container-pos" class="container">
+                            <div class="leaflet-container" class="container">
+                                {% leaflet_map "my_map" callback="map_init" %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+{% endblock %}
